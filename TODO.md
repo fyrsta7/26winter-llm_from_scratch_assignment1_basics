@@ -51,10 +51,28 @@
 - 所有核心功能完整实现并可用于训练
 
 ### 1.3 损失与优化
-- [ ] Cross-entropy：减 max 稳数值，log-sum-exp 消去，支持 batch 维，adapters.run_cross_entropy
-- [ ] AdamW：按 Loshchilov & Hutter 算法 2，继承 torch.optim.Optimizer，adapters.get_adamw_cls
-- [ ] Cosine 学习率 + warmup：adapters.run_get_lr_cosine_schedule
-- [ ] 梯度裁剪：全局梯度 L2 范数，超则缩放，ε=1e-6，adapters.run_gradient_clipping
+- [x] Cross-entropy：减 max 稳数值，log-sum-exp 消去，支持 batch 维，adapters.run_cross_entropy ✓
+- [x] AdamW：按 Loshchilov & Hutter 算法 2，继承 torch.optim.Optimizer，adapters.get_adamw_cls ✓
+- [x] Cosine 学习率 + warmup：adapters.run_get_lr_cosine_schedule ✓
+- [x] 梯度裁剪：全局梯度 L2 范数，超则缩放，ε=1e-6，adapters.run_gradient_clipping ✓
+
+**测试结果：**
+- ✅ 所有测试通过（5/5）
+  - test_softmax_matches_pytorch ✓
+  - test_cross_entropy ✓
+  - test_gradient_clipping ✓
+  - test_adamw ✓
+  - test_get_lr_cosine_schedule ✓
+
+**实现文件：**
+- `cs336_basics/model.py`：cross_entropy 函数、clip_gradients 函数
+- `cs336_basics/optimizer.py`：AdamW 类、get_cosine_schedule_with_warmup 函数
+
+**实现要点：**
+1. **Cross-entropy**：使用 log-sum-exp 技巧，减去 max 值以防止数值溢出
+2. **AdamW**：严格按照 Loshchilov & Hutter 算法 2 实现，权重衰减与梯度更新解耦
+3. **Cosine 学习率调度**：线性 warmup + 余弦退火 + 恒定最小值
+4. **梯度裁剪**：计算全局 L2 范数，按比例缩放所有梯度
 
 ### 1.4 训练与数据
 - [ ] get_batch：从 1D token 数组采样 (inputs, targets)，形状 (batch_size, context_length)，放到指定 device，adapters.run_get_batch

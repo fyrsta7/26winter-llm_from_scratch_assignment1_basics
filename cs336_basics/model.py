@@ -694,3 +694,68 @@ class TransformerLM(nn.Module):
         logits = self.lm_head(x)  # (batch, seq_len, vocab_size)
         
         return logits
+
+
+def cross_entropy(logits: Tensor, targets: Tensor) -> Tensor:
+    """
+    Compute cross-entropy loss with numerical stability.
+    
+    Uses log-sum-exp trick to avoid numerical overflow/underflow.
+    
+    Args:
+        logits: Unnormalized logits of shape (batch_size, vocab_size)
+        targets: Target indices of shape (batch_size,)
+                Each value must be in [0, vocab_size)
+    
+    Returns:
+        Scalar tensor: average cross-entropy loss across the batch
+    """
+    # For numerical stability, subtract max from logits
+    # This doesn't change the softmax output but prevents overflow
+    max_logits = torch.max(logits, dim=-1, keepdim=True)[0]
+    logits_shifted = logits - max_logits
+    
+    # Compute log(sum(exp(logits))) using the shifted logits
+    # log_sum_exp = log(sum(exp(logits_shifted))) + max_logits
+    log_sum_exp = torch.log(torch.sum(torch.exp(logits_shifted), dim=-1)) + max_logits.squeeze(-1)
+    
+    # Get the logits for the target classes
+    # targets: (batch_size,), logits: (batch_size, vocab_size)
+    # We want logits[i, targets[i]] for each i
+    target_logits = logits[torch.arange(logits.shape[0], device=logits.device), targets]
+    
+    # Cross-entropy: -log(p(target)) = -logits[target] + log_sum_exp
+    loss = -target_logits + log_sum_exp
+    
+    # Return average loss
+    return loss.mean()
+
+
+def clip_gradients(parameters, max_norm: float, eps: float = 1e-6) -> None:
+    """
+    Clip gradients by global L2 norm.
+    
+    If the global L2 norm of all gradients exceeds max_norm,
+    scale all gradients down proportionally.
+    
+    Args:
+        parameters: Iterable of parameters with gradients
+        max_norm: Maximum allowed L2 norm
+        eps: Small constant for numerical stability
+    """
+    # Compute global L2 norm of all gradients
+    total_norm = 0.0
+    for param in parameters:
+        if param.grad is not None:
+            param_norm = param.grad.data.norm(2)
+            total_norm += param_norm.item() ** 2
+    total_norm = total_norm ** 0.5
+    
+    # Compute scaling factor
+    clip_coef = max_norm / (total_norm + eps)
+    
+    # Only scale if total_norm exceeds max_norm
+    if clip_coef < 1.0:
+        for param in parameters:
+            if param.grad is not None:
+                param.grad.data.mul_(clip_coef)
